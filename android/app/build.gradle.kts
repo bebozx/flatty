@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -19,16 +18,15 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
-    // --- بداية تعديل التوقيع ---
+    // التعديل الصحيح للغة Kotlin (KTS)
     signingConfigs {
-        release {
+        create("release") {
             keyAlias = System.getenv("ALIAS")
             keyPassword = System.getenv("KEY_PASSWORD")
             storeFile = file("key.jks")
             storePassword = System.getenv("KEY_STORE_PASSWORD")
         }
     }
-    // --- نهاية تعديل التوقيع ---
 
     defaultConfig {
         applicationId = "com.example.my_factory_app"
@@ -39,12 +37,12 @@ android {
     }
 
     buildTypes {
-        release {
-            // هنا استبدلنا debug بـ release عشان المصنع يوقع التطبيق بجد
+        getByName("release") {
+            // ربط التوقيع في نسخة الـ KTS
             signingConfig = signingConfigs.getByName("release")
             
-            minifyEnabled = false
-            shrinkResources = false
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
