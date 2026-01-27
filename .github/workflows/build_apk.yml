@@ -1,9 +1,8 @@
 name: Build Flutter APK
 
 on:
-  push:
-    branches:
-      - main
+  repository_dispatch:
+    types: [build_apk]
 
 jobs:
   build:
@@ -24,14 +23,20 @@ jobs:
         with:
           channel: 'stable'
 
+      # الخطوة الأهم: حقن الكود القادم من Supabase داخل ملف main.dart
+      - name: Inject Custom Code from Supabase
+        run: |
+          echo "${{ github.event.client_payload.page_code }}" > lib/main.dart
+
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build APK
         run: flutter build apk --release
 
+      # رفع الـ APK وتسميته باسم التطبيق المبعوث من قاعدة البيانات
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: release-apk
+          name: ${{ github.event.client_payload.app_name }}-apk
           path: build/app/outputs/flutter-apk/app-release.apk
