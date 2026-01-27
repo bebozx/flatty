@@ -21,8 +21,10 @@ android {
     // التعديل الصحيح للغة Kotlin (KTS)
     signingConfigs {
         create("release") {
-            // هنا بنسحب القيم اللي باعتنها من ملف الـ YAML
-            keyAlias = System.getenv("ALIAS") ?: ""
+            // سطر التجسس (اختياري للتأكد فقط)
+            println("Checking Alias: ${System.getenv("ALIAS")}")
+            
+            keyAlias = System.getenv("ALIAS") ?: "nazer" // لو ملقاش المتغير هيجرب nazer
             keyPassword = System.getenv("KEY_PASSWORD") ?: ""
             storeFile = file("key.jks")
             storePassword = System.getenv("KEY_STORE_PASSWORD") ?: ""
