@@ -21,10 +21,11 @@ android {
     // التعديل الصحيح للغة Kotlin (KTS)
     signingConfigs {
         create("release") {
-            keyAlias = System.getenv("ALIAS")
-            keyPassword = System.getenv("KEY_PASSWORD")
+            // هنا بنسحب القيم اللي باعتنها من ملف الـ YAML
+            keyAlias = System.getenv("ALIAS") ?: ""
+            keyPassword = System.getenv("KEY_PASSWORD") ?: ""
             storeFile = file("key.jks")
-            storePassword = System.getenv("KEY_STORE_PASSWORD")
+            storePassword = System.getenv("KEY_STORE_PASSWORD") ?: ""
         }
     }
 
