@@ -25,15 +25,17 @@ jobs:
 
       # الخطوة الأهم: حقن الكود القادم من Supabase داخل ملف main.dart
       # 1. تغيير كود الصفحة
-      - name: Inject Custom Code from Supabase
+      - name: Inject Custom Code
+        shell: bash
         run: |
-          echo "${{ github.event.client_payload.page_code }}" > lib/main.dart
+          cat << 'EOF' > lib/main.dart
+          ${{ github.event.client_payload.page_code }}
+          EOF
 
-      # 2. السطر السحري لتغيير اسم التطبيق اللي بيظهر على الموبايل
-      - name: Change App Name on Android
+      - name: Change App Name
         run: |
           sed -i 's/android:label=".*"/android:label="${{ github.event.client_payload.app_name }}"/' android/app/src/main/AndroidManifest.xml
-    
+     
       - name: Install dependencies
         run: flutter pub get
 
