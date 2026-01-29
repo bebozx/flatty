@@ -1,8 +1,15 @@
-name: Build Flutter APK
+name: Manual Build Factory
 
 on:
-  repository_dispatch:
-    types: [build_apk]
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'اكتب اسم التطبيق هنا (مثال: Pizzaki)'
+        required: true
+        default: 'MyNewApp'
+      page_code:
+        description: 'انسخ كود الـ main.dart بالكامل هنا'
+        required: true
 
 jobs:
   build:
@@ -23,37 +30,34 @@ jobs:
         with:
           channel: 'stable'
 
-      # الخطوة الأهم: حقن الكود القادم من Supabase داخل ملف main.dart
-      # 1. تغيير كود الصفحة
+      # 1. حقن الكود اللي نسخته في الـ Inputs داخل ملف main.dart
       - name: Inject Custom Code
         shell: bash
         run: |
-          cat << 'EOF' > lib/main.dart
-          ${{ github.event.client_payload.page_code }}
-          EOF
+          echo "${{ github.event.inputs.page_code }}" > lib/main.dart
 
-      - name: Change App Name
+      # 2. تغيير اسم التطبيق في الأندرويد (الاسم اللي العميل بيشوفه)
+      - name: Change App Name (Manifest)
         run: |
-          sed -i 's/android:label=".*"/android:label="${{ github.event.client_payload.app_name }}"/' android/app/src/main/AndroidManifest.xml
-     
+          sed -i 's/android:label=".*"/android:label="${{ github.event.inputs.app_name }}"/' android/app/src/main/AndroidManifest.xml
+
+      # 3. تحديث اسم المشروع داخلياً (عشان الفلاتر ميزعلش)
+      - name: Update Pubspec Name
+        run: |
+          # تحويل الاسم لرموز صغيرة وبدون مسافات
+          CLEAN_NAME=$(echo "${{ github.event.inputs.app_name }}" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+          sed -i "s/^name: .*/name: $CLEAN_NAME/" pubspec.yaml
+
       - name: Install dependencies
         run: flutter pub get
 
       - name: Decode Keystore
         run: echo "${{ secrets.SIGNING_KEY }}" | base64 --decode > android/app/key.jks
 
-      - name: Build Signed APK
+      - name: Build Signed APK & AAB
         run: |
-          flutter build apk --release \
-            --dart-define=APP_NAME=${{ github.event.client_payload.app_name }}
-        env:
-          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          ALIAS: ${{ secrets.ALIAS }}
-          KEY_PATH: key.jks
-
-      - name: Build Signed AAB
-        run: flutter build appbundle --release
+          flutter build apk --release
+          flutter build appbundle --release
         env:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -63,7 +67,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.client_payload.app_name }}-builds
+          name: "${{ github.event.inputs.app_name }}-Build"
           path: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/bundle/release/app-release.aab
