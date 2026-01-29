@@ -4,12 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       app_name:
-        description: 'اكتب اسم التطبيق هنا (مثال: Pizzaki)'
+        description: 'اكتب اسم التطبيق هنا'
         required: true
-        default: 'MyNewApp'
-      page_code:
-        description: 'انسخ كود الـ main.dart بالكامل هنا'
-        required: true
+        default: 'Pizzaki'
 
 jobs:
   build:
@@ -30,23 +27,14 @@ jobs:
         with:
           channel: 'stable'
 
-      # 1. حقن الكود اللي نسخته في الـ Inputs داخل ملف main.dart
-      - name: Inject Custom Code
-        shell: bash
-        run: |
-          cat << 'EOF' > lib/main.dart
-          ${{ github.event.inputs.page_code }}
-          EOF
-
-      # 2. تغيير اسم التطبيق في الأندرويد (الاسم اللي العميل بيشوفه)
+      # تم حذف خطوة الحقن لأننا هنعدل الملف يدوياً في الريبو
+      
       - name: Change App Name (Manifest)
         run: |
           sed -i 's/android:label=".*"/android:label="${{ github.event.inputs.app_name }}"/' android/app/src/main/AndroidManifest.xml
 
-      # 3. تحديث اسم المشروع داخلياً (عشان الفلاتر ميزعلش)
       - name: Update Pubspec Name
         run: |
-          # تحويل الاسم لرموز صغيرة وبدون مسافات
           CLEAN_NAME=$(echo "${{ github.event.inputs.app_name }}" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
           sed -i "s/^name: .*/name: $CLEAN_NAME/" pubspec.yaml
 
