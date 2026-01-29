@@ -297,7 +297,9 @@ class _ClientHomePageState extends State<ClientHomePage> {
                               child: Column(
                                 children: [
                                   ListTile(
-                                    leading: p.images.isNotEmpty ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(p.images.first.imageUrl, width: 60, height: 60, fit: BoxFit.cover)) : const Icon(Icons.pizza, size: 40),
+                                    leading: p.images.isNotEmpty 
+                                    ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(p.images.first.imageUrl, width: 60, height: 60, fit: BoxFit.cover)) 
+                                    : const Icon(Icons.flutter_dash, size: 40),
                                     title: Text(p.nameAr, style: const TextStyle(fontWeight: FontWeight.bold)),
                                     subtitle: Text(p.descriptionAr ?? ''),
                                   ),
