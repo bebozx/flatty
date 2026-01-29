@@ -859,12 +859,13 @@ class _VariantsAndImagesTabState extends State<VariantsAndImagesTab> {
     setState(() {});
   }
 
-  Future<void> _uploadImages(String productId) async {
-    // اختيار ملفات متعددة مع إرجاع الـ bytes (لو متاحة)
+ Future<void> _uploadImages(String productId) async {
+  try {
     final res = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: true,
-      withData: true, // مهم في v8.x
+      // خفيفة على الذاكرة: خليه false، ونستخدم path لو متاح
+      withData: false,
     );
     if (res == null || res.files.isEmpty) return;
 
@@ -877,26 +878,59 @@ class _VariantsAndImagesTabState extends State<VariantsAndImagesTab> {
     for (int i = 0; i < res.files.length; i++) {
       final f = res.files[i];
 
-      // لو bytes موجودة استخدمها، وإلا اقرأ من المسار عبر dart:io
-      final Uint8List bytes = f.bytes ?? await io.File(f.path!).readAsBytes();
+      final ext = p.extension(f.name).toLowerCase(); // .jpg .png ...
+      final safeExt = ext.isEmpty ? '.jpg' : ext;
+      final filename = 'img${indexStart + i + 1}$safeExt';
+      final storagePath = 'products/$productId/$filename';
 
-      final ext = p.extension(f.name).toLowerCase(); // مثال: .jpg
-      final filename = 'img${indexStart + i + 1}$ext';
-      final path = 'products/$productId/$filename';
+      // content-type بسيط
+      String contentType = 'application/octet-stream';
+      final e = safeExt.replaceAll('.', '');
+      if (e == 'jpg' || e == 'jpeg') contentType = 'image/jpeg';
+      else if (e == 'png') contentType = 'image/png';
+      else if (e == 'webp') contentType = 'image/webp';
+      else if (e == 'gif') contentType = 'image/gif';
 
-      await supa.storage
-          .from(STORAGE_BUCKET)
-          .uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(
-              contentType: 'image/${ext.replaceAll('.', '').isEmpty ? 'jpeg' : ext.replaceAll('.', '')}',
-            ),
+      // ✅ أهم نقطة: متعملش ! على path
+      String publicUrl;
+
+      if (f.path != null && f.path!.isNotEmpty) {
+        // ✅ الأفضل على الموبايل: رفع File مباشرة (بدون تحميله كله في الذاكرة)
+        final file = io.File(f.path!);
+
+        await supa.storage.from(STORAGE_BUCKET).upload(
+              storagePath,
+              file,
+              fileOptions: FileOptions(
+                upsert: true,
+                contentType: contentType,
+              ),
+            );
+
+        publicUrl = supa.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+      } else if (f.bytes != null) {
+        // ✅ لو path مش متاح (نادر على الموبايل) نستخدم bytes
+        await supa.storage.from(STORAGE_BUCKET).uploadBinary(
+              storagePath,
+              f.bytes!,
+              fileOptions: FileOptions(
+                upsert: true,
+                contentType: contentType,
+              ),
+            );
+
+        publicUrl = supa.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+      } else {
+        // ✅ لا bytes ولا path → ما نكراش، نبلّغ المستخدم
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('تعذر قراءة الملف: ${f.name} (جرّب صورة من المعرض المحلي)')),
           );
+        }
+        continue;
+      }
 
-      final publicUrl =
-          supa.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-
+      // ✅ خزّن URL في جدول الصور
       await supa.from('product_images').insert({
         'product_id': productId,
         'image_url': publicUrl,
@@ -906,12 +940,18 @@ class _VariantsAndImagesTabState extends State<VariantsAndImagesTab> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم رفع الصور بنجاح')),
+        const SnackBar(content: Text('تم رفع صور المنتج بنجاح')),
       );
       setState(() {});
     }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('فشل رفع صور المنتج: $e')),
+      );
+    }
   }
-
+}
   Future<void> _deleteImage(String id) async {
     await supa.from('product_images').delete().eq('id', id);
     setState(() {});
