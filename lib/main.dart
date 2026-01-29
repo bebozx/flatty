@@ -24,7 +24,7 @@ class CategoryModel {
 class ProductModel {
   final String id, categoryId, nameAr, descriptionAr;
   List<String> images = [];
-  List<Map<String, dynamic>> variants = [];
+  List<dynamic> variants = []; // تم تعديل النوع لتجنب خطأ التعيين
   ProductModel({required this.id, required this.categoryId, required this.nameAr, this.descriptionAr = ''});
 }
 
@@ -36,7 +36,11 @@ class PizzacoClientApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFF5722), primary: const Color(0xFFFF5722), secondary: const Color(0密1A237E).withOpacity(0)), // تم إصلاح اللون هنا
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFFF5722),
+          primary: const Color(0xFFFF5722),
+          secondary: const Color(0xFF1A237E), // تم استبدال الحرف الصيني بـ x
+        ),
         fontFamily: 'Cairo',
       ),
       home: const ClientHomePage(),
@@ -78,7 +82,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
       _products = (prods as List).map((p) {
         var m = ProductModel(id: p['id'].toString(), categoryId: p['category_id'].toString(), nameAr: p['name_ar'], descriptionAr: p['description_ar'] ?? '');
         m.images = (imgs as List).where((i) => i['product_id'] == m.id).map((i) => i['image_url'].toString()).toList();
-        m.variants = (vars as List).where((v) => v['product_id'] == m.id).toList();
+        m.variants = (vars as List).where((v) => v['product_id'] == m.id).toList(); // الإصلاح هنا
         if (m.variants.isNotEmpty) _selectedVariant[m.id] = m.variants.first['key'];
         return m;
       }).toList();
@@ -169,7 +173,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
     setState(() => _cart["${p.id}-${v['key']}"] = {'p': p, 'v': v, 'qty': (_cart["${p.id}-${v['key']}"]?['qty'] ?? 0) + 1});
   }
 
-  Widget _buildCartBar() => Container(padding: const EdgeInsets.all(20), decoration: const BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('السلة جاهزة ✨', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), ElevatedButton(onPressed: _checkout, child: const Text("اتمام الطلب"))]));
+  Widget _buildCartBar() => Container(padding: const EdgeInsets.all(20), decoration: const BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('السلة جاهزة ✨', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), ElevatedButton(onPressed: _checkout, child: const Text("اتمام الطلب"))]));
 
   Future<void> _checkout() async {
     final prefs = await SharedPreferences.getInstance();
