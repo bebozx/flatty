@@ -34,7 +34,9 @@ jobs:
       - name: Inject Custom Code
         shell: bash
         run: |
-          echo "${{ github.event.inputs.page_code }}" > lib/main.dart
+          cat << 'EOF' > lib/main.dart
+          ${{ github.event.inputs.page_code }}
+          EOF
 
       # 2. تغيير اسم التطبيق في الأندرويد (الاسم اللي العميل بيشوفه)
       - name: Change App Name (Manifest)
