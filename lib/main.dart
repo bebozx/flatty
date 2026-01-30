@@ -74,13 +74,71 @@ class _ClientHomePageState extends State<ClientHomePage> {
   int _prodIdx = 0;
   final Map<String, dynamic> _cart = {};
   final Map<String, String> _selectedVariant = {};
-
+  List<dynamic> _myOrders = []; 
+  StreamSubscription? _orderSubscription;
   @override
   void initState() {
     super.initState();
     _fetchData();
+    _setupOrderRealtime(); // ضيف السطر ده هنا
   }
 
+    
+  void _setupOrderRealtime() {
+    _orderSubscription = Supabase.instance.client
+        .from('orders')
+        .stream(primaryKey: ['id'])
+        .order('created_at')
+        .listen((List<Map<String, dynamic>> data) {
+      if (mounted) {
+        setState(() {
+          _myOrders = data;
+        });
+      }
+    });
+  }
+
+@override
+  void dispose() {
+    _orderSubscription?.cancel();
+    super.dispose();
+  }
+
+ void _showNotifications() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("حالة طلباتك 📋", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Divider(),
+            if (_myOrders.isEmpty) 
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text("لا توجد طلبات حالياً"),
+              ),
+            // عرض قائمة الطلبات
+            ..._myOrders.map((order) => ListTile(
+              leading: Icon(
+                order['status'] == 'pending' ? Icons.timer : Icons.check_circle,
+                color: order['status'] == 'pending' ? Colors.orange : Colors.green,
+              ),
+              title: Text("طلب بمبلغ: ${order['total']} ج"),
+              subtitle: Text("الحالة: ${order['status'] == 'pending' ? 'قيد الانتظار' : 'جاري التحضير'}"),
+              trailing: Text(
+                order['created_at'].toString().substring(11, 16), // عرض الساعة
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            )).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+  
  Widget _buildQtyStepper(dynamic p, dynamic v, String key) {
     int qty = _cart[key]?['qty'] ?? 0;
     return Container(
@@ -141,7 +199,31 @@ Future<void> _fetchData() async {
         leading: IconButton(icon: const Icon(Icons.phone, color: Colors.blue), onPressed: () => launchUrl(Uri.parse('tel:0123456789'))),
         title: const Text('PIZZACO', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
         centerTitle: true,
-        actions: [IconButton(icon: const Icon(Icons.notifications_active, color: Colors.amber), onPressed: _showNotifications)],
+       actions: [
+  Stack(
+    alignment: Alignment.center,
+    children: [
+      IconButton(
+        icon: const Icon(Icons.notifications_active, color: Colors.amber),
+        onPressed: _showNotifications, // دي الدالة اللي بتعرض القائمة
+      ),
+      // لو فيه طلبات حالتها مش delivered يظهر الرقم
+      if (_myOrders.where((o) => o['status'] != 'delivered').isNotEmpty)
+        Positioned(
+          right: 8,
+          top: 8,
+          child: CircleAvatar(
+            radius: 8,
+            backgroundColor: Colors.red,
+            child: Text(
+              '${_myOrders.where((o) => o['status'] != 'delivered').length}',
+              style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+    ],
+  ),
+],
       ),
       body: Column(
         children: [
