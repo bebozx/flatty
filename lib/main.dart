@@ -477,10 +477,8 @@ onPressed: () async {
       ),
     );
   }
-  void _showNotifications() async {
-    final prefs = await SharedPreferences.getInstance();
-    final phone = prefs.getString('cust_phone');
-    if (phone == null) return;
+  void _showNotifications() {
+    
     
     showModalBottomSheet(
       context: context,
