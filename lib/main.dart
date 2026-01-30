@@ -102,33 +102,43 @@ class _ClientHomePageState extends State<ClientHomePage> {
   
   Future<void> _fetchData() async {
     try {
-      final cats = await Supabase.instance.client.from('categories').select().eq('is_active', true).order('order');
-      _categories = cats as List;
+      final client = Supabase.instance.client;
+      
+      // جلب الأقسام
+      final catsData = await client.from('categories').select().eq('is_active', true).order('order');
+      _categories = catsData as List;
+
+      // جلب المنتجات والصور والمتغيرات
+      final prodsData = await client.from('products').select().eq('is_active', true).order('order');
+      final imgsData = await client.from('product_images').select();
+      final varsData = await client.from('product_variants').select().eq('is_active', true);
+
+      _products = (prodsData as List).map((p) {
+        p['images'] = (imgsData as List).where((i) => i['product_id'] == p['id']).map((i) => i['image_url']).toList();
+        p['variants'] = (varsData as List).where((v) => v['product_id'] == p['id']).toList();
+        if (p['variants'].isNotEmpty) _selectedVariant[p['id'].toString()] = p['variants'].first['key'];
+        return p;
+      }).toList();
+
       if (_categories.isNotEmpty) {
-        // بنحاول نلاقي قسم البيتزا أولاً، لو مش موجود نفتح أول قسم
+        // البحث عن قسم "بيتزا" كافتراضي
         final pizzaCat = _categories.firstWhere(
           (c) => c['name_ar'].toString().contains('بيتزا'), 
           orElse: () => _categories.first
         );
         _selectedCatId = pizzaCat['id'].toString();
       }
-
-      final prods = await Supabase.instance.client.from('products').select().eq('is_active', true).order('order');
-      final imgs = await Supabase.instance.client.from('product_images').select();
-      final vars = await Supabase.instance.client.from('product_variants').select().eq('is_active', true);
-
-      _products = (prods as List).map((p) {
-        p['images'] = (imgs as List).where((i) => i['product_id'] == p['id']).map((i) => i['image_url']).toList();
-        p['variants'] = (vars as List).where((v) => v['product_id'] == p['id']).toList();
-        if (p['variants'].isNotEmpty) _selectedVariant[p['id'].toString()] = p['variants'].first['key'];
-        return p;
-      }).toList();
-      setState(() => _loading = false);
     } catch (e) {
-      debugPrint("Error: $e");
+      debugPrint("Supabase Error: $e");
+      // إظهار رسالة خطأ للمستخدم بدل ما يفضل اللودر شغال
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ في الاتصال: $e")));
+      }
+    } finally {
+      // لازم نقفل اللودر سواء نجحنا أو فشلنا
+      if (mounted) setState(() => _loading = false);
     }
   }
-
   double get _cartTotal => _cart.values.fold(0, (sum, item) => sum + (item['v']['price'] * item['qty']));
   
  @override
