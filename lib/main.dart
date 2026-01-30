@@ -387,56 +387,39 @@ void _openCheckout() async {
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 55),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
-                ),
-                onPressed: () async {
-                  if (nameC.text.isEmpty || phoneC.text.isEmpty || addrC.text.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("⚠️ برجاء إكمال كافة البيانات"))
-                    );
-                    return;
-                  }
+                ),// ابحث عن الجزء ده داخل ElevatedButton في دالة _openCheckout واستبدله
+onPressed: () async {
+  if (nameC.text.isEmpty || phoneC.text.isEmpty || addrC.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("⚠️ كمل البيانات يا ريس")));
+    return;
+  }
 
-                  try {
-                    // تحويل السلة لقائمة نصية واضحة لجدول الطلبات
-                    List itemsSummary = _cart.values.map((it) => 
-                      "${it['p']['name_ar']} (${it['v']['name_ar']}) عدد: ${it['qty']}"
-                    ).toList();
+  try {
+    String summary = _cart.values.map((it) => "${it['p']['name_ar']} (${it['v']['name_ar']}) x${it['qty']}").join(' , ');
 
-                    // الإرسال الفعلي لقاعدة البيانات
-                    await Supabase.instance.client.from('orders').insert({
-                      'customer_snapshot': {
-                        'name': nameC.text, 
-                        'phone': phoneC.text, 
-                        'address': addrC.text,
-                        'order_details': itemsSummary // ده اللي هيظهرلك في سوبابيز
-                      },
-                      'total': _cartTotal,
-                      'status': 'pending'
-                    });
+    await Supabase.instance.client.from('orders').insert({
+      'customer_snapshot': {
+        'name': nameC.text, 
+        'phone': phoneC.text, 
+        'address': addrC.text,
+        'items_summary': summary
+      },
+      'total': _cartTotal,
+      'subtotal': _cartTotal, // أضفنا ده عشان نحل أيرور الصورة الأخيرة
+      'status': 'pending'
+    });
 
-                    // حفظ بيانات العميل محلياً لسهولة الطلب المرة القادمة
-                    await prefs.setString('cust_phone', phoneC.text);
-                    await prefs.setString('cust_name', nameC.text);
-                    await prefs.setString('cust_address', addrC.text);
-
-                    if (c.mounted) {
-                      setState(() => _cart.clear()); // تصفير السلة
-                      Navigator.pop(c); // إغلاق نافذة التأكيد
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          backgroundColor: Colors.green,
-                          content: Text("✅ مبروك! طلبك وصل المطعم وجاري التحضير")
-                        )
-                      );
-                    }
-                  } catch (e) {
-                    // في حالة وجود خطأ في سوبابيز أو الإنترنت
-                    debugPrint("Order Error: $e");
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("❌ عذراً، حدث خطأ أثناء الإرسال: $e"))
-                    );
-                  }
-                },
+    if (mounted) {
+      setState(() => _cart.clear());
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(backgroundColor: Colors.green, content: Text("🚀 طلبك وصل بنجاح!")));
+    }
+  } catch (e) {
+    // لو لسه فيه أيرور هيظهرلك هنا بالتفصيل
+    debugPrint("Final Error: $e");
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("❌ فشل الإرسال: $e")));
+  }
+},
                 child: const Text("إرسال الطلب الآن 🚀", style: TextStyle(fontSize: 18)),
               ),
               const SizedBox(height: 25),
