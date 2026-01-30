@@ -108,27 +108,54 @@ class _ClientHomePageState extends State<ClientHomePage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    
+    // فلترة المنتجات بناءً على القسم المختار
     final filtered = _products.where((p) => p['category_id'].toString() == _selectedCatId).toList();
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.phone, color: Colors.blue), onPressed: () => launchUrl(Uri.parse('tel:0123456789'))),
-        title: const Text('PIZZACO', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        // زر الاتصال على اليسار
+        leading: IconButton(
+          icon: const Icon(Icons.phone, color: Colors.blue), 
+          onPressed: () => launchUrl(Uri.parse('tel:0123456789'))
+        ),
+        // اسم المطعم في المنتصف بالإنجليزية وبدون إضافات
+        title: const Text(
+          'PIZZACO', 
+          style: TextStyle(
+            fontWeight: FontWeight.bold, 
+            letterSpacing: 2, 
+            color: Colors.black
+          )
+        ),
         centerTitle: true,
+        // جرس الإشعارات على اليمين
         actions: [
-          IconButton(icon: const Icon(Icons.notifications_active, color: Colors.amber), onPressed: _showNotifications),
+          IconButton(
+            icon: const Icon(Icons.notifications_active, color: Colors.amber), 
+            onPressed: _showNotifications
+          ),
         ],
       ),
       body: Column(
         children: [
+          // قائمة الأقسام (بيتزا، مقبلات، الخ)
           _buildCatList(),
-          Expanded(child: filtered.isEmpty ? const Center(child: Text("جاري التحميل...")) : _buildSlider(filtered)),
-          if (_cart.isNotEmpty) _buildCartBar(),
+          // منطقة عرض المنتجات (السلايدر)
+          Expanded(
+            child: filtered.isEmpty 
+              ? const Center(child: Text("لا توجد منتجات في هذا القسم")) 
+              : _buildSlider(filtered)
+          ),
         ],
       ),
+      // بار السلة السفلي يظهر فقط عند وجود طلبات
+      bottomNavigationBar: _cart.isNotEmpty ? _buildCartBar() : null,
     );
   }
-
   Widget _buildCatList() => SizedBox(
     height: 60,
     child: ListView.builder(
@@ -148,46 +175,53 @@ class _ClientHomePageState extends State<ClientHomePage> {
   );
 
   Widget _buildSlider(List<dynamic> prods) {
-    final p = prods[_prodIdx];
-    return Stack(
-      children: [
-        Column(
-          children: [
-            Container(
-              height: 250, // ارتفاع ثابت
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                image: DecorationImage(image: NetworkImage(p['images'].isNotEmpty ? p['images'].first : 'https://via.placeholder.com/400'), fit: BoxFit.cover),
-              ),
+  final p = prods[_prodIdx];
+  return Stack(
+    children: [
+      Column(
+        children: [
+          // الصورة بارتفاع ثابت ومحمي
+          Container(
+            height: 250,
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              image: DecorationImage(image: NetworkImage(p['images'].isNotEmpty ? p['images'].first : 'https://via.placeholder.com/400'), fit: BoxFit.cover),
             ),
-            Text(p['name_ar'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Text(p['description_ar'] ?? '', textAlign: TextAlign.center)),
-            const Spacer(),
-            Wrap(spacing: 8, children: p['variants'].map<Widget>((v) => ChoiceChip(
-              label: Text('${v['name_ar']} (${v['price']} ج)'),
-              selected: _selectedVariant[p['id'].toString()] == v['key'],
-              onSelected: (s) => setState(() => _selectedVariant[p['id'].toString()] = v['key']),
-            )).toList()),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: ElevatedButton(
-                onPressed: () {
-                  final v = p['variants'].firstWhere((v) => v['key'] == _selectedVariant[p['id'].toString()]);
-                  setState(() => _cart["${p['id']}-${v['key']}"] = {'p': p, 'v': v, 'qty': (_cart["${p['id']}-${v['key']}"]?['qty'] ?? 0) + 1});
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5722), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50)),
-                child: const Text("إضافة للطلب"),
-              ),
+          ),
+          Text(p['name_ar'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(p['description_ar'] ?? '', style: const TextStyle(color: Colors.grey)),
+          const SizedBox(height: 20),
+          // جعل الأحجام قابلة للتمرير أفقياً وإضافة تلقائية
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: p['variants'].map<Widget>((v) => Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: ChoiceChip(
+                  avatar: _selectedVariant[p['id'].toString()] == v['key'] ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                  label: Text('${v['name_ar']} (${v['price']} ج)'),
+                  selected: _selectedVariant[p['id'].toString()] == v['key'],
+                  onSelected: (s) {
+                    setState(() {
+                      _selectedVariant[p['id'].toString()] = v['key'];
+                      // إضافة تلقائية للسلة عند الاختيار
+                      _cart["${p['id']}-${v['key']}"] = {'p': p, 'v': v, 'qty': 1};
+                    });
+                  },
+                ),
+              )).toList(),
             ),
-          ],
-        ),
-        if (_prodIdx > 0) Positioned(left: 10, top: 110, child: _navBtn(Icons.arrow_back_ios, () => setState(() => _prodIdx--))),
-        if (_prodIdx < prods.length - 1) Positioned(right: 10, top: 110, child: _navBtn(Icons.arrow_forward_ios, () => setState(() => _prodIdx++))),
-      ],
-    );
-  }
+          ),
+        ],
+      ),
+      if (_prodIdx > 0) Positioned(left: 10, top: 110, child: _navBtn(Icons.arrow_back_ios, () => setState(() => _prodIdx--))),
+      if (_prodIdx < prods.length - 1) Positioned(right: 10, top: 110, child: _navBtn(Icons.arrow_forward_ios, () => setState(() => _prodIdx++))),
+    ],
+  );
+}
 
   Widget _navBtn(IconData icon, VoidCallback t) => CircleAvatar(backgroundColor: Colors.grey[200], child: IconButton(icon: Icon(icon, size: 18, color: Colors.black), onPressed: t));
 
@@ -203,7 +237,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
     ),
   );
 
-  void _openCheckout() async {
+void _openCheckout() async {
     final prefs = await SharedPreferences.getInstance();
     final nameC = TextEditingController(text: prefs.getString('cust_name'));
     final phoneC = TextEditingController(text: prefs.getString('cust_phone'));
@@ -212,37 +246,109 @@ class _ClientHomePageState extends State<ClientHomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
       builder: (c) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom, left: 20, right: 20, top: 20),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(c).viewInsets.bottom, 
+          left: 20, 
+          right: 20, 
+          top: 20
+        ),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("تفاصيل طلبك", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              ..._cart.values.map((it) => ListTile(title: Text("${it['p']['name_ar']} - ${it['v']['name_ar']}"), trailing: Text("x${it['qty']}"))),
-              const Divider(),
-              TextField(controller: nameC, decoration: const InputDecoration(labelText: 'الاسم')),
-              TextField(controller: phoneC, decoration: const InputDecoration(labelText: 'الموبايل')),
-              TextField(controller: addrC, decoration: const InputDecoration(labelText: 'العنوان بالتفصيل')),
+              const Text(
+                "تفاصيل طلبك", 
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)
+              ),
+              const SizedBox(height: 10),
+              // عرض محتويات السلة
+              ..._cart.values.map((it) => ListTile(
+                leading: const Icon(Icons.shopping_basket_outlined, color: Color(0xFFFF5722)),
+                title: Text("${it['p']['name_ar']} - ${it['v']['name_ar']}"),
+                trailing: Text("x${it['qty']}", style: const TextStyle(fontWeight: FontWeight.bold)),
+              )),
+              const Divider(height: 30),
+              TextField(
+                controller: nameC, 
+                decoration: const InputDecoration(labelText: 'الاسم', border: OutlineInputBorder())
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: phoneC, 
+                decoration: const InputDecoration(labelText: 'الموبايل', border: OutlineInputBorder()),
+                keyboardType: TextInputType.phone
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: addrC, 
+                decoration: const InputDecoration(labelText: 'العنوان بالتفصيل', border: OutlineInputBorder()),
+                maxLines: 2
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF5722),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                ),
                 onPressed: () async {
-                  if(nameC.text.isEmpty || phoneC.text.isEmpty) return;
-                  final order = await Supabase.instance.client.from('orders').insert({
-                    'customer_snapshot': {'name': nameC.text, 'phone': phoneC.text, 'address': addrC.text},
-                    'total': _cartTotal,
-                    'status': 'قيد التحضير'
-                  }).select().single();
-                  
-                  await prefs.setString('cust_phone', phoneC.text);
-                  await prefs.setString('cust_name', nameC.text);
-                  await prefs.setString('cust_address', addrC.text);
-                  
-                  setState(() => _cart.clear());
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ تم إرسال طلبك بنجاح! تابع الإشعارات")));
+                  if (nameC.text.isEmpty || phoneC.text.isEmpty || addrC.text.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("برجاء ملء جميع البيانات"))
+                    );
+                    return;
+                  }
+
+                  try {
+                    // 1. إظهار لودينج عشان اليوزر يحس إن فيه حاجة بتحصل
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const Center(child: CircularProgressIndicator()),
+                    );
+
+                    // 2. إرسال الطلب لـ سوبابيز
+                    await Supabase.instance.client.from('orders').insert({
+                      'customer_snapshot': {
+                        'name': nameC.text, 
+                        'phone': phoneC.text, 
+                        'address': addrC.text
+                      },
+                      'total': _cartTotal,
+                      'status': 'جديد'
+                    });
+
+                    // 3. حفظ البيانات محلياً للمرة الجاية
+                    await prefs.setString('cust_phone', phoneC.text);
+                    await prefs.setString('cust_name', nameC.text);
+                    await prefs.setString('cust_address', addrC.text);
+
+                    // 4. قفل اللودينج وقفل الشيت وتصفير السلة
+                    if (mounted) {
+                      Navigator.pop(context); // قفل الـ Loading Dialog
+                      Navigator.pop(context); // قفل الـ BottomSheet
+                      setState(() => _cart.clear());
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          backgroundColor: Colors.green,
+                          content: Text("✅ تم إرسال طلبك بنجاح! تابع حالة الطلب من الجرس")
+                        )
+                      );
+                    }
+                  } catch (e) {
+                    // قفل اللودينج لو حصل خطأ
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("خطأ في الاتصال: $e"))
+                    );
+                  }
                 },
-                child: const Text("تأكيد وإرسال الطلب"),
+                child: const Text("تأكيد وإرسال الطلب الآن", style: TextStyle(fontSize: 18)),
               ),
               const SizedBox(height: 20),
             ],
