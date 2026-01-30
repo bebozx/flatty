@@ -81,11 +81,37 @@ class _ClientHomePageState extends State<ClientHomePage> {
     _fetchData();
   }
 
+ Widget _buildQtyStepper(dynamic p, dynamic v, String key) {
+    int qty = _cart[key]?['qty'] ?? 0;
+    return Container(
+      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(icon: const Icon(Icons.remove_circle_outline), onPressed: qty > 0 ? () => setState(() {
+            if (qty == 1) _cart.remove(key); else _cart[key]['qty']--;
+          }) : null),
+          Text('$qty', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          IconButton(icon: const Icon(Icons.add_circle_outline, color: Color(0xFFFF5722)), onPressed: () => setState(() {
+            if (qty == 0) _cart[key] = {'p': p, 'v': v, 'qty': 1}; else _cart[key]['qty']++;
+          })),
+        ],
+      ),
+    );
+  }
+  
   Future<void> _fetchData() async {
     try {
       final cats = await Supabase.instance.client.from('categories').select().eq('is_active', true).order('order');
       _categories = cats as List;
-      if (_categories.isNotEmpty) _selectedCatId = _categories.first['id'].toString();
+      if (_categories.isNotEmpty) {
+        // بنحاول نلاقي قسم البيتزا أولاً، لو مش موجود نفتح أول قسم
+        final pizzaCat = _categories.firstWhere(
+          (c) => c['name_ar'].toString().contains('بيتزا'), 
+          orElse: () => _categories.first
+        );
+        _selectedCatId = pizzaCat['id'].toString();
+      }
 
       final prods = await Supabase.instance.client.from('products').select().eq('is_active', true).order('order');
       final imgs = await Supabase.instance.client.from('product_images').select();
@@ -104,58 +130,38 @@ class _ClientHomePageState extends State<ClientHomePage> {
   }
 
   double get _cartTotal => _cart.values.fold(0, (sum, item) => sum + (item['v']['price'] * item['qty']));
-
-  @override
+  
+ @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    
-    // فلترة المنتجات بناءً على القسم المختار
     final filtered = _products.where((p) => p['category_id'].toString() == _selectedCatId).toList();
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        // زر الاتصال على اليسار
-        leading: IconButton(
-          icon: const Icon(Icons.phone, color: Colors.blue), 
-          onPressed: () => launchUrl(Uri.parse('tel:0123456789'))
-        ),
-        // اسم المطعم في المنتصف بالإنجليزية وبدون إضافات
-        title: const Text(
-          'PIZZACO', 
-          style: TextStyle(
-            fontWeight: FontWeight.bold, 
-            letterSpacing: 2, 
-            color: Colors.black
-          )
-        ),
+        leading: IconButton(icon: const Icon(Icons.phone, color: Colors.blue), onPressed: () => launchUrl(Uri.parse('tel:0123456789'))),
+        title: const Text('PIZZACO', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
         centerTitle: true,
-        // جرس الإشعارات على اليمين
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_active, color: Colors.amber), 
-            onPressed: _showNotifications
-          ),
-        ],
+        actions: [IconButton(icon: const Icon(Icons.notifications_active, color: Colors.amber), onPressed: _showNotifications)],
       ),
       body: Column(
         children: [
-          // قائمة الأقسام (بيتزا، مقبلات، الخ)
           _buildCatList(),
-          // منطقة عرض المنتجات (السلايدر)
           Expanded(
             child: filtered.isEmpty 
-              ? const Center(child: Text("لا توجد منتجات في هذا القسم")) 
-              : _buildSlider(filtered)
+              ? const Center(child: Text("لا توجد منتجات")) 
+              : SingleChildScrollView( // أضفنا سكرول للمحتوى كله عشان نضمن مفيش تداخل
+                  padding: const EdgeInsets.only(bottom: 100), // مسافة أمان للبار السفلي
+                  child: _buildSlider(filtered),
+                ),
           ),
         ],
       ),
-      // بار السلة السفلي يظهر فقط عند وجود طلبات
+      extendBody: true, // بيخلي المحتوى يفرش ورا البار لكن بمسافة أمان
       bottomNavigationBar: _cart.isNotEmpty ? _buildCartBar() : null,
     );
   }
+  
   Widget _buildCatList() => SizedBox(
     height: 60,
     child: ListView.builder(
@@ -261,103 +267,99 @@ void _openCheckout() async {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                "تفاصيل طلبك", 
+                "تأكيد الطلب 🧾", 
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)
               ),
-              const SizedBox(height: 10),
-              // عرض محتويات السلة
+              const SizedBox(height: 15),
+              // عرض محتويات السلة قبل الإرسال
               ..._cart.values.map((it) => ListTile(
-                leading: const Icon(Icons.shopping_basket_outlined, color: Color(0xFFFF5722)),
+                leading: const Icon(Icons.check_circle, color: Colors.green),
                 title: Text("${it['p']['name_ar']} - ${it['v']['name_ar']}"),
                 trailing: Text("x${it['qty']}", style: const TextStyle(fontWeight: FontWeight.bold)),
               )),
               const Divider(height: 30),
               TextField(
                 controller: nameC, 
-                decoration: const InputDecoration(labelText: 'الاسم', border: OutlineInputBorder())
+                decoration: const InputDecoration(labelText: 'الاسم الكامل', border: OutlineInputBorder())
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               TextField(
                 controller: phoneC, 
-                decoration: const InputDecoration(labelText: 'الموبايل', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'رقم الموبايل', border: OutlineInputBorder()),
                 keyboardType: TextInputType.phone
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               TextField(
                 controller: addrC, 
-                decoration: const InputDecoration(labelText: 'العنوان بالتفصيل', border: OutlineInputBorder()),
+                decoration: const InputDecoration(labelText: 'عنوان التوصيل بالتفصيل', border: OutlineInputBorder()),
                 maxLines: 2
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 25),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFF5722),
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
+                  minimumSize: const Size(double.infinity, 55),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
                 ),
                 onPressed: () async {
                   if (nameC.text.isEmpty || phoneC.text.isEmpty || addrC.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("برجاء ملء جميع البيانات"))
+                      const SnackBar(content: Text("⚠️ برجاء إكمال كافة البيانات"))
                     );
                     return;
                   }
 
                   try {
-                    // 1. إظهار لودينج عشان اليوزر يحس إن فيه حاجة بتحصل
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const Center(child: CircularProgressIndicator()),
-                    );
+                    // تحويل السلة لقائمة نصية واضحة لجدول الطلبات
+                    List itemsSummary = _cart.values.map((it) => 
+                      "${it['p']['name_ar']} (${it['v']['name_ar']}) عدد: ${it['qty']}"
+                    ).toList();
 
-                    // 2. إرسال الطلب لـ سوبابيز
+                    // الإرسال الفعلي لقاعدة البيانات
                     await Supabase.instance.client.from('orders').insert({
                       'customer_snapshot': {
                         'name': nameC.text, 
                         'phone': phoneC.text, 
-                        'address': addrC.text
+                        'address': addrC.text,
+                        'order_details': itemsSummary // ده اللي هيظهرلك في سوبابيز
                       },
                       'total': _cartTotal,
                       'status': 'جديد'
                     });
 
-                    // 3. حفظ البيانات محلياً للمرة الجاية
+                    // حفظ بيانات العميل محلياً لسهولة الطلب المرة القادمة
                     await prefs.setString('cust_phone', phoneC.text);
                     await prefs.setString('cust_name', nameC.text);
                     await prefs.setString('cust_address', addrC.text);
 
-                    // 4. قفل اللودينج وقفل الشيت وتصفير السلة
-                    if (mounted) {
-                      Navigator.pop(context); // قفل الـ Loading Dialog
-                      Navigator.pop(context); // قفل الـ BottomSheet
-                      setState(() => _cart.clear());
+                    if (c.mounted) {
+                      setState(() => _cart.clear()); // تصفير السلة
+                      Navigator.pop(c); // إغلاق نافذة التأكيد
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           backgroundColor: Colors.green,
-                          content: Text("✅ تم إرسال طلبك بنجاح! تابع حالة الطلب من الجرس")
+                          content: Text("✅ مبروك! طلبك وصل المطعم وجاري التحضير")
                         )
                       );
                     }
                   } catch (e) {
-                    // قفل اللودينج لو حصل خطأ
-                    Navigator.pop(context);
+                    // في حالة وجود خطأ في سوبابيز أو الإنترنت
+                    debugPrint("Order Error: $e");
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("خطأ في الاتصال: $e"))
+                      SnackBar(content: Text("❌ عذراً، حدث خطأ أثناء الإرسال: $e"))
                     );
                   }
                 },
-                child: const Text("تأكيد وإرسال الطلب الآن", style: TextStyle(fontSize: 18)),
+                child: const Text("إرسال الطلب الآن 🚀", style: TextStyle(fontSize: 18)),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 25),
             ],
           ),
         ),
       ),
     );
   }
-
   void _showNotifications() async {
     final prefs = await SharedPreferences.getInstance();
     final phone = prefs.getString('cust_phone');
