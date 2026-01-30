@@ -104,16 +104,13 @@ Future<void> _fetchData() async {
     try {
       final client = Supabase.instance.client;
       
-      // 1. جلب الأقسام
       final catsData = await client.from('categories').select().eq('is_active', true).order('order');
       _categories = catsData as List;
 
-      // 2. جلب المنتجات والصور والمتغيرات
       final prodsData = await client.from('products').select().eq('is_active', true).order('order');
       final imgsData = await client.from('product_images').select();
       final varsData = await client.from('product_variants').select().eq('is_active', true);
 
-      // 3. ترتيب البيانات
       _products = (prodsData as List).map((p) {
         p['images'] = (imgsData as List).where((i) => i['product_id'] == p['id']).map((i) => i['image_url']).toList();
         p['variants'] = (varsData as List).where((v) => v['product_id'] == p['id']).toList();
@@ -121,24 +118,12 @@ Future<void> _fetchData() async {
         return p;
       }).toList();
 
-      // 4. تحديد القسم الافتراضي (إصلاح خطأ orElse)
       if (_categories.isNotEmpty) {
-        final pizzaCat = _categories.firstWhere(
-          (c) => c['name_ar'].toString().contains('بيتزا'),
-          orElse: () => _categories.first, // هنا تم إصلاح القوس والنوع
-        );
-        _selectedCatId = pizzaCat['id'].toString();
+        _selectedCatId = _categories.first['id'].toString();
       }
-
     } catch (e) {
-      debugPrint("Supabase Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("خطأ في جلب البيانات: $e"))
-        );
-      }
+      debugPrint("Fetch Error: $e");
     } finally {
-      // إغلاق اللودر في كل الحالات لضمان فتح التطبيق
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -381,7 +366,7 @@ void _openCheckout() async {
                         'order_details': itemsSummary // ده اللي هيظهرلك في سوبابيز
                       },
                       'total': _cartTotal,
-                      'status': 'جديد'
+                      'status': 'pending'
                     });
 
                     // حفظ بيانات العميل محلياً لسهولة الطلب المرة القادمة
