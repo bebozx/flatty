@@ -83,20 +83,26 @@ class _ClientHomePageState extends State<ClientHomePage> {
     _setupOrderRealtime(); // ضيف السطر ده هنا
   }
 
-    
-  void _setupOrderRealtime() {
+void _setupOrderRealtime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final myPhone = prefs.getString('cust_phone') ?? '';
+
     _orderSubscription = Supabase.instance.client
         .from('orders')
         .stream(primaryKey: ['id'])
         .order('created_at')
-        .listen((List<Map<String, dynamic>> data) {
+        .listen((data) {
       if (mounted) {
         setState(() {
-          _myOrders = data;
+          // فلترة الطلبات عشان تعرض طلبات الموبايل ده بس
+          _myOrders = data.where((o) => 
+            o['customer_snapshot']['phone'] == myPhone
+          ).toList();
         });
       }
     });
-  }
+  }    
+
 
 @override
   void dispose() {
@@ -456,7 +462,10 @@ onPressed: () async {
       'subtotal': _cartTotal, // أضفنا ده عشان نحل أيرور الصورة الأخيرة
       'status': 'pending'
     });
-
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cust_name', nameC.text);
+    await prefs.setString('cust_phone', phoneC.text);
+    await prefs.setString('cust_address', addrC.text);
     if (mounted) {
       setState(() => _cart.clear());
       Navigator.pop(context);
