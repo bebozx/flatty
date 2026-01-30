@@ -104,40 +104,6 @@ class _ClientHomePageState extends State<ClientHomePage> {
     super.dispose();
   }
 
- void _showNotifications() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("حالة طلباتك 📋", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const Divider(),
-            if (_myOrders.isEmpty) 
-              const Padding(
-                padding: EdgeInsets.all(20),
-                child: Text("لا توجد طلبات حالياً"),
-              ),
-            // عرض قائمة الطلبات
-            ..._myOrders.map((order) => ListTile(
-              leading: Icon(
-                order['status'] == 'pending' ? Icons.timer : Icons.check_circle,
-                color: order['status'] == 'pending' ? Colors.orange : Colors.green,
-              ),
-              title: Text("طلب بمبلغ: ${order['total']} ج"),
-              subtitle: Text("الحالة: ${order['status'] == 'pending' ? 'قيد الانتظار' : 'جاري التحضير'}"),
-              trailing: Text(
-                order['created_at'].toString().substring(11, 16), // عرض الساعة
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            )).toList(),
-          ],
-        ),
-      ),
-    );
-  }
   
  Widget _buildQtyStepper(dynamic p, dynamic v, String key) {
     int qty = _cart[key]?['qty'] ?? 0;
