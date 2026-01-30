@@ -477,28 +477,49 @@ onPressed: () async {
       ),
     );
   }
+
   void _showNotifications() {
-    
-    
-    showModalBottomSheet(
-      context: context,
-      builder: (c) => StreamBuilder(
-        stream: Supabase.instance.client.from('orders').stream(primaryKey: ['id']),
-        builder: (ctx, snap) {
-          if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-          final active = snap.data!.where((o) => o['customer_snapshot']['phone'] == phone && o['status'] != 'تم التسليم').toList();
-          return active.isEmpty 
-            ? const Center(child: Text("لا توجد تحديثات حالية"))
-            : ListView.builder(
-                itemCount: active.length,
-                itemBuilder: (c, i) => ListTile(
-                  leading: const Icon(Icons.flutter_dash, color: Color(0xFFFF5722)),
-                  title: Text("طلب #${active[i]['id'].toString().substring(0,5)}"),
-                  subtitle: Text("الحالة: ${active[i]['status']}"),
+  // مش محتاجين async ولا محتاجين نجيب التليفون يدوي هنا
+  // لأن البيانات موجودة فعلياً في قائمة _myOrders
+  
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20))
+    ),
+    builder: (context) => Container(
+      padding: const EdgeInsets.all(20),
+      height: MediaQuery.of(context).size.height * 0.7,
+      child: Column(
+        children: [
+          const Text("حالة طلباتك 📋", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Divider(),
+          Expanded(
+            child: _myOrders.isEmpty 
+              ? const Center(child: Text("لا توجد طلبات حالياً"))
+              : ListView.builder(
+                  itemCount: _myOrders.length,
+                  itemBuilder: (context, index) {
+                    final order = _myOrders[index];
+                    // عرض الحالة بناءً على اللي جاي من سوبابيز
+                    return ListTile(
+                      leading: Icon(
+                        order['status'] == 'pending' ? Icons.timer : Icons.check_circle,
+                        color: order['status'] == 'pending' ? Colors.orange : Colors.green,
+                      ),
+                      title: Text("طلب بمبلغ: ${order['total']} ج"),
+                      subtitle: Text("الحالة الحالية: ${order['status']}"),
+                      trailing: Text(
+                        order['created_at'].toString().substring(11, 16),
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    );
+                  },
                 ),
-              );
-        },
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
