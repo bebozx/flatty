@@ -100,19 +100,20 @@ class _ClientHomePageState extends State<ClientHomePage> {
     );
   }
   
-  Future<void> _fetchData() async {
+Future<void> _fetchData() async {
     try {
       final client = Supabase.instance.client;
       
-      // جلب الأقسام
+      // 1. جلب الأقسام
       final catsData = await client.from('categories').select().eq('is_active', true).order('order');
       _categories = catsData as List;
 
-      // جلب المنتجات والصور والمتغيرات
+      // 2. جلب المنتجات والصور والمتغيرات
       final prodsData = await client.from('products').select().eq('is_active', true).order('order');
       final imgsData = await client.from('product_images').select();
       final varsData = await client.from('product_variants').select().eq('is_active', true);
 
+      // 3. ترتيب البيانات
       _products = (prodsData as List).map((p) {
         p['images'] = (imgsData as List).where((i) => i['product_id'] == p['id']).map((i) => i['image_url']).toList();
         p['variants'] = (varsData as List).where((v) => v['product_id'] == p['id']).toList();
@@ -120,25 +121,28 @@ class _ClientHomePageState extends State<ClientHomePage> {
         return p;
       }).toList();
 
+      // 4. تحديد القسم الافتراضي (إصلاح خطأ orElse)
       if (_categories.isNotEmpty) {
-        // البحث عن قسم "بيتزا" كافتراضي
         final pizzaCat = _categories.firstWhere(
-          (c) => c['name_ar'].toString().contains('بيتزا'), 
-          orElse: () => _categories.first
+          (c) => c['name_ar'].toString().contains('بيتزا'),
+          orElse: () => _categories.first, // هنا تم إصلاح القوس والنوع
         );
         _selectedCatId = pizzaCat['id'].toString();
       }
+
     } catch (e) {
       debugPrint("Supabase Error: $e");
-      // إظهار رسالة خطأ للمستخدم بدل ما يفضل اللودر شغال
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("خطأ في الاتصال: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("خطأ في جلب البيانات: $e"))
+        );
       }
     } finally {
-      // لازم نقفل اللودر سواء نجحنا أو فشلنا
+      // إغلاق اللودر في كل الحالات لضمان فتح التطبيق
       if (mounted) setState(() => _loading = false);
     }
   }
+  
   double get _cartTotal => _cart.values.fold(0, (sum, item) => sum + (item['v']['price'] * item['qty']));
   
  @override
@@ -190,55 +194,97 @@ class _ClientHomePageState extends State<ClientHomePage> {
     ),
   );
 
-  Widget _buildSlider(List<dynamic> prods) {
-  final p = prods[_prodIdx];
-  return Stack(
-    children: [
-      Column(
-        children: [
-          // الصورة بارتفاع ثابت ومحمي
-          Container(
-            height: 250,
-            width: double.infinity,
-            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              image: DecorationImage(image: NetworkImage(p['images'].isNotEmpty ? p['images'].first : 'https://via.placeholder.com/400'), fit: BoxFit.cover),
+Widget _buildSlider(List<dynamic> prods) {
+    final p = prods[_prodIdx];
+    final String currentVariantKey = _selectedVariant[p['id'].toString()] ?? '';
+    final String cartKey = "${p['id']}-$currentVariantKey";
+    
+    // جلب الكمية الحالية من السلة
+    int qty = _cart[cartKey]?['qty'] ?? 0;
+
+    return Column(
+      children: [
+        // الصورة
+        Container(
+          height: 250,
+          width: double.infinity,
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            image: DecorationImage(
+              image: NetworkImage(p['images'].isNotEmpty ? p['images'].first : 'https://via.placeholder.com/400'), 
+              fit: BoxFit.cover
             ),
           ),
-          Text(p['name_ar'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          Text(p['description_ar'] ?? '', style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 20),
-          // جعل الأحجام قابلة للتمرير أفقياً وإضافة تلقائية
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+        ),
+        // الاسم والوصف
+        Text(p['name_ar'], style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Text(p['description_ar'] ?? '', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+        ),
+        const SizedBox(height: 15),
+        
+        // اختيار الحجم (Scrollable)
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: p['variants'].map<Widget>((v) => Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: ChoiceChip(
+                label: Text('${v['name_ar']} (${v['price']} ج)'),
+                selected: currentVariantKey == v['key'],
+                onSelected: (s) => setState(() => _selectedVariant[p['id'].toString()] = v['key']),
+                selectedColor: const Color(0xFFFF5722).withOpacity(0.2),
+              ),
+            )).toList(),
+          ),
+        ),
+        
+        const SizedBox(height: 20),
+
+        // التحكم في الكمية (+ / -) بدلاً من زر الإضافة
+        if (currentVariantKey.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(30)),
             child: Row(
-              children: p['variants'].map<Widget>((v) => Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: ChoiceChip(
-                  avatar: _selectedVariant[p['id'].toString()] == v['key'] ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
-                  label: Text('${v['name_ar']} (${v['price']} ج)'),
-                  selected: _selectedVariant[p['id'].toString()] == v['key'],
-                  onSelected: (s) {
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.remove_circle, color: Colors.grey, size: 30),
+                  onPressed: qty > 0 ? () => setState(() {
+                    if (qty == 1) _cart.remove(cartKey); else _cart[cartKey]['qty']--;
+                  }) : null,
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  child: Text('$qty', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle, color: Color(0xFFFF5722), size: 30),
+                  onPressed: () {
+                    final variant = p['variants'].firstWhere((v) => v['key'] == currentVariantKey);
                     setState(() {
-                      _selectedVariant[p['id'].toString()] = v['key'];
-                      // إضافة تلقائية للسلة عند الاختيار
-                      _cart["${p['id']}-${v['key']}"] = {'p': p, 'v': v, 'qty': 1};
+                      if (qty == 0) {
+                        _cart[cartKey] = {'p': p, 'v': variant, 'qty': 1};
+                      } else {
+                        _cart[cartKey]['qty']++;
+                      }
                     });
                   },
                 ),
-              )).toList(),
+              ],
             ),
           ),
-        ],
-      ),
-      if (_prodIdx > 0) Positioned(left: 10, top: 110, child: _navBtn(Icons.arrow_back_ios, () => setState(() => _prodIdx--))),
-      if (_prodIdx < prods.length - 1) Positioned(right: 10, top: 110, child: _navBtn(Icons.arrow_forward_ios, () => setState(() => _prodIdx++))),
-    ],
-  );
-}
-
+          
+        // مساحة أمان إضافية عشان البار السفلي
+        const SizedBox(height: 100),
+      ],
+    );
+  }
+  
   Widget _navBtn(IconData icon, VoidCallback t) => CircleAvatar(backgroundColor: Colors.grey[200], child: IconButton(icon: Icon(icon, size: 18, color: Colors.black), onPressed: t));
 
   Widget _buildCartBar() => Container(
