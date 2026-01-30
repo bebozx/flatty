@@ -269,7 +269,7 @@ class _ClientHomePageState extends State<ClientHomePage> {
             : ListView.builder(
                 itemCount: active.length,
                 itemBuilder: (c, i) => ListTile(
-                  leading: const Icon(Icons.pizza_tool, color: Colors.deepOrange),
+                  leading: const Icon(Icons.flutter_dash, color: Color(0xFFFF5722)),
                   title: Text("طلب #${active[i]['id'].toString().substring(0,5)}"),
                   subtitle: Text("الحالة: ${active[i]['status']}"),
                 ),
