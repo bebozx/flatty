@@ -84,24 +84,31 @@ class _ClientHomePageState extends State<ClientHomePage> {
   }
 
 void _setupOrderRealtime() async {
-    final prefs = await SharedPreferences.getInstance();
-    final myPhone = prefs.getString('cust_phone') ?? '';
+  final prefs = await SharedPreferences.getInstance();
 
-    _orderSubscription = Supabase.instance.client
-        .from('orders')
-        .stream(primaryKey: ['id'])
-        .order('created_at')
-        .listen((data) {
-      if (mounted) {
-        setState(() {
-          // فلترة الطلبات عشان تعرض طلبات الموبايل ده بس
+  _orderSubscription = Supabase.instance.client
+      .from('orders')
+      .stream(primaryKey: ['id'])
+      .order('created_at')
+      .listen((data) {
+    if (mounted) {
+      // بنقرأ الرقم المحفوظ حالياً في كل لفتة بيانات
+      final myPhone = prefs.getString('cust_phone');
+
+      setState(() {
+        if (myPhone != null && myPhone.isNotEmpty) {
+          // فلترة صارمة: وريني طلباتي أنا بس
           _myOrders = data.where((o) => 
             o['customer_snapshot']['phone'] == myPhone
           ).toList();
-        });
-      }
-    });
-  }    
+        } else {
+          // لو لسه مفيش رقم متسجل، القائمة تفضل فاضية (صفر) لضمان الخصوصية
+          _myOrders = [];
+        }
+      });
+    }
+  });
+}
 
 
 @override
@@ -466,6 +473,7 @@ onPressed: () async {
     await prefs.setString('cust_name', nameC.text);
     await prefs.setString('cust_phone', phoneC.text);
     await prefs.setString('cust_address', addrC.text);
+    _setupOrderRealtime();
     if (mounted) {
       setState(() => _cart.clear());
       Navigator.pop(context);
