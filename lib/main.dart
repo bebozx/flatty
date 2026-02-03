@@ -30,12 +30,21 @@ class _IdentityAppState extends State<IdentityApp> {
 
   Future<void> checkServer() async {
     try {
-      final res = await http.post(Uri.parse('https://identity-verifier-backend.vercel.app/api/verify'));
+      // ركز هنا: شيل أي / في آخر الرابط قبل api
+      var url = Uri.parse('https://identity-verifier-backend.vercel.app/api/verify'); 
+      
+      final res = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+      );
+
       setState(() => serverResponse = res.body);
     } catch (e) {
-      setState(() => serverResponse = "خطأ: $e");
+      setState(() => serverResponse = "Connection Error: $e");
     }
   }
+  
+
 
   @override
   void dispose() {
