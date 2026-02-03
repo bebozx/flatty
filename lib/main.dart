@@ -5,7 +5,7 @@ void main() => runApp(MaterialApp(home: TestScreen()));
 
 class TestScreen extends StatelessWidget {
   // هنا بنحط رابط فيرسل اللي أنت جربته وطلع "Method Not Allowed"
-  final String vercelUrl = 'https://رابط-مشروعك-بتاع-فيرسل.vercel.app/api/verify';
+  final String vercelUrl = 'https://identity-verifier-backend.vercel.app/api/verify';
 
   Future<void> checkConnection() async {
     try {
