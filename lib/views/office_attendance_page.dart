@@ -79,11 +79,19 @@ class _OfficeAttendancePageState extends State<OfficeAttendancePage> {
     _uploadAttendance(videoFile);
   }
 
-  Future<void> _uploadAttendance(XFile file) async {
-    // سنضع كود الرفع للسيرفر هنا
-    Get.snackbar("نجاح", "تم تسجيل الفيديو، جاري الرفع...");
-  }
-
+  // استدعاء الخدمة داخل الصفحة
+Future<void> _uploadAttendance(XFile file) async {
+  final position = await Geolocator.getCurrentPosition();
+  
+  // تشغيل خدمة الرفع
+  await UploadService().uploadAttendance(
+    videoFile: File(file.path),
+    lat: position.latitude,
+    long: position.longitude,
+    type: 'office',
+  );
+}
+  
   @override
   void dispose() {
     _controller?.dispose();
