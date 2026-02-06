@@ -1,8 +1,12 @@
+import 'dart:io'; // حل مشكلة خطأ File
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:get/get.dart';
+
+// حل مشكلة خطأ UploadService (تأكد من صحة المسار)
+import '../services/upload_service.dart';
 
 class OfficeAttendancePage extends StatefulWidget {
   const OfficeAttendancePage({super.key});
