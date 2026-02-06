@@ -47,7 +47,7 @@ class RootHandler extends StatelessWidget {
 
     if (session == null) {
       // replace بصفحة تسجيل الدخول إذا لم يكن هناك جلسة
-      return const LoginPage(); 
+      return  LoginPage(); 
     } else {
       // فحص هل الحساب موقوف أم لا قبل الدخول
       return const AuthChecker();
@@ -83,10 +83,10 @@ class AuthChecker extends StatelessWidget {
         
         if (snapshot.hasData && snapshot.data == true) {
           // الموظف نشط -> اذهب للرئيسية
-          return const MainNavigation(); 
+          return  MainNavigation(); 
         } else {
           // الموظف موقوف -> اعرض رسالة تنبيه واعمل تسجيل خروج
-          return const SuspendedAccountPage();
+          return  SuspendedAccountPage();
         }
       },
     );
