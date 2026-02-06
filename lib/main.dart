@@ -11,8 +11,8 @@ void main() async {
 
   // تهيئة سوبابيز - استبدل القيم ببيانات مشروعك
   await Supabase.initialize(
-    url: 'YOUR_SUPABASE_URL',
-    anonKey: 'YOUR_SUPABASE_ANON_KEY',
+    url: 'https://phxrbhoasozlcowqkbdm.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoeHJiaG9hc296bGNvd3FrYmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzODc3MzQsImV4cCI6MjA4NTk2MzczNH0.0GIhxiqmZk7I5ETEg88j77SsebQa3pDg3sKcMp3Vdrc',
   );
 
   runApp(const MyApp());
