@@ -1,90 +1,94 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get/get.dart';
+
+// استيراد الصفحات (سنقوم بإنشائها في الخطوات القادمة)
+// import 'views/login_page.dart';
+// import 'views/main_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final cameras = await availableCameras();
-  final front = cameras.firstWhere((c) => c.lensDirection == CameraLensDirection.front);
-  runApp(MaterialApp(debugShowCheckedModeBanner: false, home: IdentityApp(camera: front)));
+
+  // تهيئة سوبابيز - استبدل القيم ببيانات مشروعك
+  await Supabase.initialize(
+    url: 'YOUR_SUPABASE_URL',
+    anonKey: 'YOUR_SUPABASE_ANON_KEY',
+  );
+
+  runApp(const MyApp());
 }
 
-class IdentityApp extends StatefulWidget {
-  final CameraDescription camera;
-  const IdentityApp({super.key, required this.camera});
-  @override
-  State<IdentityApp> createState() => _IdentityAppState();
-}
-
-class _IdentityAppState extends State<IdentityApp> {
-  late CameraController _controller;
-  bool _isProcessing = false;
-  String _statusMessage = "جاري تشغيل الذكاء الاصطناعي...";
-  final FaceDetector _faceDetector = FaceDetector(options: FaceDetectorOptions(performanceMode: FaceDetectorMode.fast));
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
-  void initState() {
-    super.initState();
-    _controller = CameraController(widget.camera, ResolutionPreset.low, enableAudio: false);
-    _controller.initialize().then((_) {
-      _controller.startImageStream((image) => _processImage(image));
-    });
+  Widget build(BuildContext context) {
+    return GetMaterialApp(
+      title: 'Attendance App',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorSchemeSeed: Colors.blue,
+        fontFamily: 'Arial', // يمكنك تغيير الخط لاحقاً
+      ),
+      // نقطة البداية تعتمد على فحص الجلسة
+      home: const RootHandler(),
+    );
   }
+}
 
-  void _processImage(CameraImage image) async {
-    if (_isProcessing) return;
-    _isProcessing = true;
+// كود فحص حالة الدخول (Authentication Handler)
+class RootHandler extends StatelessWidget {
+  const RootHandler({super.key});
 
-    try {
-      final faces = await _faceDetector.processImage(
-        InputImage.fromBytes(
-          bytes: image.planes[0].bytes,
-          metadata: InputImageMetadata(
-            size: Size(image.width.toDouble(), image.height.toDouble()),
-            rotation: InputImageRotation.rotation270deg, // الزاوية الصحيحة للكاميرا الأمامية
-            format: InputImageFormat.nv21, // التنسيق القياسي لـ أندرويد
-            bytesPerRow: image.planes[0].bytesPerRow,
-          ),
-        ),
-      );
+  @override
+  Widget build(BuildContext context) {
+    final session = Supabase.instance.client.auth.currentSession;
 
-      if (mounted) {
-        setState(() {
-          _statusMessage = faces.isNotEmpty ? "✅ تم اكتشاف الوجه" : "❌ قرب الموبايل من وشك";
-        });
-      }
-    } catch (e) {
-      // لو فيه خطأ يظهر هنا بدل ما يفضل معلق
-      setState(() => _statusMessage = "خطأ في المعالجة");
+    if (session == null) {
+      // replace بصفحة تسجيل الدخول إذا لم يكن هناك جلسة
+      return const LoginPage(); 
+    } else {
+      // فحص هل الحساب موقوف أم لا قبل الدخول
+      return const AuthChecker();
     }
-    _isProcessing = false;
   }
+}
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _faceDetector.close();
-    super.dispose();
+// كود التأكد من أن الموظف نشط (Status Checker)
+class AuthChecker extends StatelessWidget {
+  const AuthChecker({super.key});
+
+  Future<bool> isUserActive() async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final data = await Supabase.instance.client
+        .from('profiles')
+        .select('status')
+        .eq('id', userId)
+        .single();
+    
+    return data['status'] == 'active';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Center(child: CameraPreview(_controller)),
-          Positioned(
-            bottom: 40, left: 20, right: 20,
-            child: Text(
-              _statusMessage,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 20, backgroundColor: Colors.black54),
-            ),
-          ),
-        ],
-      ),
+    return FutureBuilder<bool>(
+      future: isUserActive(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        
+        if (snapshot.hasData && snapshot.data == true) {
+          // الموظف نشط -> اذهب للرئيسية
+          return const MainNavigation(); 
+        } else {
+          // الموظف موقوف -> اعرض رسالة تنبيه واعمل تسجيل خروج
+          return const SuspendedAccountPage();
+        }
+      },
     );
   }
 }
