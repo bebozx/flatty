@@ -41,7 +41,7 @@ dependencies:
   get: ^4.6.6 # لإدارة الحالة (State Management) والاشعارات بسهولة
   
   # الميديا والموقع
-  camera: ^0.10.5+5
+   
   geolocator: ^10.1.0
   path_provider: ^2.1.1
   video_player: ^2.8.1
