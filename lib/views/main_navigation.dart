@@ -16,9 +16,9 @@ class _MainNavigationState extends State<MainNavigation> {
 
   // 2. قائمة الصفحات التي برمجناها سابقاً
   final List<Widget> _pages = [
-    const OfficeAttendancePage(),
-    const FieldAttendancePage(),
-    const AttendanceReportPage(),
+     OfficeAttendancePage(),
+     FieldAttendancePage(),
+     AttendanceReportPage(),
   ];
 
   @override
