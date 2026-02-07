@@ -38,37 +38,51 @@ class MyApp extends StatelessWidget {
   }
 }
 
+// 1. استبدل كلاس RootHandler بهذا ليكون أكثر استجابة للحالة
 class RootHandler extends StatelessWidget {
   const RootHandler({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final session = Supabase.instance.client.auth.currentSession;
-
-    if (session == null) {
-      // تم حذف const لضمان عدم حدوث خطأ أثناء البناء
-      return LoginPage(); 
-    } else {
-      return const AuthChecker();
-    }
+    // استخدام StreamBuilder لمراقبة حالة التسجيل لحظة بلحظة
+    return StreamBuilder<AuthState>(
+      stream: Supabase.instance.client.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        final session = snapshot.data?.session;
+        if (session == null) {
+          return LoginPage();
+        } else {
+          return const AuthChecker();
+        }
+      },
+    );
   }
 }
 
+// 2. استبدل كلاس AuthChecker بهذا (الإصدار المقاوم للأخطاء)
 class AuthChecker extends StatelessWidget {
   const AuthChecker({super.key});
 
   Future<bool> isUserActive() async {
     try {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return false;
+
+      // استخدام maybeSingle بدل single لمنع الانهيار عند التأخير
       final data = await Supabase.instance.client
           .from('profiles')
           .select('status')
-          .eq('id', userId)
-          .single();
-      
+          .eq('id', user.id)
+          .maybeSingle(); 
+
+      if (data == null) {
+        debugPrint("User profile not found for ID: ${user.id}");
+        return false;
+      }
+
       return data['status'] == 'active';
     } catch (e) {
-      // في حال حدوث خطأ في جلب البيانات نعتبره غير نشط للأمان
+      debugPrint("AuthChecker Error: $e");
       return false;
     }
   }
@@ -84,14 +98,15 @@ class AuthChecker extends StatelessWidget {
           );
         }
         
+        // التحقق من الحالة بمرونة أكبر
         if (snapshot.hasData && snapshot.data == true) {
-          // الموظف نشط (تم حذف const هنا أيضاً)
-          return MainNavigation(); 
+          return MainNavigation();
         } else {
-          // الموظف موقوف أو حدث خطأ
           return SuspendedAccountPage();
         }
       },
     );
   }
 }
+
+ 
