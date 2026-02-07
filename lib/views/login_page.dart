@@ -32,13 +32,23 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (response.user != null) {
-        // 3. الانتقال لصفحة التحقق من الحالة (التي كتبناها في الماين)
-        Get.offAllNamed('/'); // يعيد توجيه المستخدم لـ RootHandler
+        // نجح الدخول، الـ RootHandler سيتولى توجيهك
+        Get.offAllNamed('/'); 
       }
+    } on AuthException catch (e) {
+      // 3. تعديل جوهري: إظهار رسالة الخطأ الحقيقية من سوبابيز
+      // لو الباسورد غلط هيقولك "Invalid login credentials" مش "راجع الـ HR"
+      Get.snackbar("خطأ في البيانات", e.message, 
+          snackPosition: SnackPosition.BOTTOM, 
+          backgroundColor: Colors.redAccent, 
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5));
     } catch (e) {
-      // 4. عرض خطأ في حال فشل الدخول
-      Get.snackbar("خطأ في الدخول", "تأكد من البيانات أو تواصل مع الـ HR",
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+      // 4. خطأ تقني غير متوقع (مثل الإنترنت)
+      Get.snackbar("خطأ تقني", "حدث خطأ غير متوقع: $e",
+          snackPosition: SnackPosition.BOTTOM, 
+          backgroundColor: Colors.orange, 
+          colorText: Colors.white);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -53,7 +63,6 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // شعار مؤقت أو أيقونة
               const Icon(Icons.lock_person_rounded, size: 80, color: Colors.blue),
               const SizedBox(height: 20),
               const Text(
