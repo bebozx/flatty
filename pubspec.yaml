@@ -41,7 +41,7 @@ dependencies:
   get: ^4.6.6 # لإدارة الحالة (State Management) والاشعارات بسهولة
   speech_to_text: ^6.6.2
   flutter_tts: ^4.2.2
-  permission_handler: ^11.3.1
+  
   # الميديا والموقع
    
   geolocator: ^10.1.0
