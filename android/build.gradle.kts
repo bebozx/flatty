@@ -1,3 +1,14 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // هذا السطر سيجبر المشروع على استخدام نسخة كوتلن حديثة تحل مشكلة مكتبة الصوت
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10")
+    }
+}
+
 allprojects {
     repositories {
         google()
