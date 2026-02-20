@@ -1,94 +1,196 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:get/get.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-// تفعيل الاستيراد
-import 'views/login_page.dart';
-import 'views/main_navigation.dart';
-import 'views/suspended_account_page.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  await Supabase.initialize(
-    url: 'https://phxrbhoasozlcowqkbdm.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBoeHJiaG9hc296bGNvd3FrYmRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzODc3MzQsImV4cCI6MjA4NTk2MzczNH0.0GIhxiqmZk7I5ETEg88j77SsebQa3pDg3sKcMp3Vdrc',
-  );
-
-  runApp(const MyApp());
+void main() {
+  runApp(MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: ThemeData.dark(),
+    home: VoiceAssistant(),
+  ));
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class VoiceAssistant extends StatefulWidget {
+  @override
+  _VoiceAssistantState createState() => _VoiceAssistantState();
+}
+
+class _VoiceAssistantState extends State<VoiceAssistant> {
+  // تعريف المحركات
+  SpeechToText _speech = SpeechToText();
+  FlutterTts _tts = FlutterTts();
+  
+  // المتغيرات
+  bool _isListening = false;
+  bool _isSpeaker = true; // التحكم في السبيكر
+  String _statusText = "اضغط على الدائرة للبدء";
+  String _aiResponse = "";
+  List<Map<String, String>> _history = [];
+
+  // رابط نيتلفاي الخاص بك (ضع رابطك هنا بعد الرفع)
+  final String netlifyUrl = 'https://assistantbob.netlify.app/.netlify/functions/chat';
 
   @override
-  Widget build(BuildContext context) {
-    return GetMaterialApp(
-      title: 'Attendance App',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
-      home: const RootHandler(),
+  void initState() {
+    super.initState();
+    _initTts();
+  }
+
+  // إعداد محرك النطق
+  void _initTts() async {
+    await _tts.setLanguage("ar-SA");
+    await _tts.setSpeechRate(0.5); // سرعة متوسطة مريحة
+    
+    // أهم ميزة: الاستماع التلقائي بعد انتهاء الرد
+    _tts.setCompletionHandler(() {
+      print("انتهى المساعد من الكلام، سأفتح الميكروفون الآن...");
+      _startListening();
+    });
+  }
+
+  // تبديل السبيكر / سماعة الأذن
+  void _toggleSpeaker() async {
+    setState(() {
+      _isSpeaker = !_isSpeaker;
+    });
+    // في أندرويد و iOS، تحويل الصوت من السبيكر لسماعة المكالمات
+    await _tts.setIosAudioCategory(
+      _isSpeaker ? IosTextToSpeechAudioCategory.playback : IosTextToSpeechAudioCategory.playAndRecord,
+      [IosTextToSpeechAudioCategoryOptions.defaultToSpeaker]
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_isSpeaker ? "تم تشغيل السبيكر" : "تم التحويل لسماعة الأذن (السرية)"))
     );
   }
-}
 
-class RootHandler extends StatelessWidget {
-  const RootHandler({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // مراقبة حالة المستخدم لحظياً
-    return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
-        final session = snapshot.data?.session;
-        return session == null ? LoginPage() : const AuthChecker();
-      },
-    );
-  }
-}
-
-class AuthChecker extends StatelessWidget {
-  const AuthChecker({super.key});
-
-  Future<String> checkUserStatus() async {
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return 'no_user';
-
-      final data = await Supabase.instance.client
-          .from('profiles')
-          .select('status')
-          .eq('id', user.id)
-          .maybeSingle();
-
-      if (data == null) return 'no_profile';
-      return data['status'] ?? 'inactive';
-    } catch (e) {
-      debugPrint("خطأ في الاتصال بالقاعدة: $e");
-      return 'error';
+  // بدء الاستماع
+  void _startListening() async {
+    bool available = await _speech.initialize();
+    if (available) {
+      setState(() {
+        _isListening = true;
+        _statusText = "أنا أسمعك الآن...";
+      });
+      _speech.listen(
+        localeId: "ar-SA",
+        onResult: (val) {
+          if (val.finalResult) {
+            setState(() {
+              _isListening = false;
+              _statusText = "جاري التفكير...";
+            });
+            _getAIResponse(val.recognizedWords);
+          }
+        },
+      );
     }
   }
 
+  // إرسال الكلام للذكاء الاصطناعي
+  Future<void> _getAIResponse(String userText) async {
+    _history.add({"role": "user", "content": userText});
+
+    try {
+      final response = await http.post(
+        Uri.parse(netlifyUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"messages": _history}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        String reply = data['choices'][0]['message']['content'];
+        
+        setState(() {
+          _aiResponse = reply;
+          _history.add({"role": "assistant", "content": reply});
+        });
+
+        // المساعد ينطق الرد
+        await _tts.speak(reply);
+      } else {
+        _handleError();
+      }
+    } catch (e) {
+      _handleError();
+    }
+  }
+
+  void _handleError() {
+    setState(() => _statusText = "خطأ في الاتصال");
+    _tts.speak("عذراً، حدث خطأ في الاتصال بالإنترنت.");
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<String>(
-      future: checkUserStatus(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
-
-        if (snapshot.data == 'active') {
-          return MainNavigation();
-        } else {
-          // هنا سيعرض الصفحة الحمراء، ولو تابعت الـ Debug Console ستعرف السبب (no_profile أو error)
-          return SuspendedAccountPage();
-        }
-      },
+    return Scaffold(
+      backgroundColor: Colors.black, // أسود لراحة العين
+      appBar: AppBar(
+        backgroundColor: Colors.grey[900],
+        title: Text("رفيقي العربي"),
+        actions: [
+          // زر السبيكر/السماعة في الأعلى
+          IconButton(
+            icon: Icon(_isSpeaker ? Icons.volume_up : Icons.phone_in_talk),
+            onPressed: _toggleSpeaker,
+            tooltip: "تبديل مكان الصوت",
+          )
+        ],
+      ),
+      body: Column(
+        children: [
+          // مساحة لعرض النص
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.all(20),
+              alignment: Alignment.center,
+              child: SingleChildScrollView(
+                child: Text(
+                  _aiResponse.isEmpty ? _statusText : _aiResponse,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.amberAccent, // لون مريح ولا يجهد العين
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // الزر الكبير للتحكم
+          GestureDetector(
+            onTap: () {
+              if (!_isListening) _startListening();
+            },
+            child: Container(
+              width: double.infinity,
+              height: 250,
+              decoration: BoxDecoration(
+                color: _isListening ? Colors.red[900] : Colors.blue[900],
+                borderRadius: BorderRadius.vertical(top: Radius.circular(50)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isListening ? Icons.mic : Icons.mic_none,
+                    size: 80,
+                    color: Colors.white,
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    _isListening ? "تحدث الآن" : "اضغط هنا لبدء الحوار",
+                    style: TextStyle(fontSize: 20, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
