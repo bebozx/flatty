@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.my_factory_app"
+    namespace = "com.nazer.my_factory_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
